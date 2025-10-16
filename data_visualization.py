@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -15,6 +14,7 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.linear_model import Ridge, Lasso
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import explained_variance_score, median_absolute_error
 
 #load dataset csv
 def load_dataset(file_path):
@@ -552,6 +552,169 @@ def train_salary_prediction_models_improved(X_train, X_test, y_train, y_test):
     
     return results
 
+def calculate_comprehensive_metrics(y_true, y_pred, model_name):
+    """
+    Calculates comprehensive accuracy metrics for regression models.
+    
+    Parameters:
+    y_true: Actual values
+    y_pred: Predicted values
+    model_name: Name of the model
+    
+    Returns:
+    dict: Dictionary with all metrics
+    """
+    # Basic metrics
+    r2 = r2_score(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(y_true, y_pred)
+    
+    # Additional metrics
+    explained_var = explained_variance_score(y_true, y_pred)
+    median_ae = median_absolute_error(y_true, y_pred)
+    
+    # Percentage-based metrics
+    mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100  # Mean Absolute Percentage Error
+    
+    # Custom accuracy metrics
+    within_10_percent = np.mean(np.abs((y_true - y_pred) / y_true) <= 0.10) * 100
+    within_20_percent = np.mean(np.abs((y_true - y_pred) / y_true) <= 0.20) * 100
+    within_30_percent = np.mean(np.abs((y_true - y_pred) / y_true) <= 0.30) * 100
+    
+    metrics = {
+        'model_name': model_name,
+        'r2_score': r2,
+        'explained_variance': explained_var,
+        'mse': mse,
+        'rmse': rmse,
+        'mae': mae,
+        'median_ae': median_ae,
+        'mape': mape,
+        'within_10_percent': within_10_percent,
+        'within_20_percent': within_20_percent,
+        'within_30_percent': within_30_percent
+    }
+    
+    return metrics
+
+def print_model_accuracy_report(metrics):
+    """
+    Prints a comprehensive accuracy report for a model.
+    """
+    print(f"\n{'='*50}")
+    print(f"ACCURACY REPORT: {metrics['model_name']}")
+    print(f"{'='*50}")
+    
+    print(f"📊 GOODNESS OF FIT:")
+    print(f"   R² Score:              {metrics['r2_score']:.4f}")
+    print(f"   Explained Variance:    {metrics['explained_variance']:.4f}")
+    
+    print(f"\n💰 ERROR METRICS (in USD):")
+    print(f"   MSE:                   ${metrics['mse']:,.0f}")
+    print(f"   RMSE:                  ${metrics['rmse']:,.0f}")
+    print(f"   MAE:                   ${metrics['mae']:,.0f}")
+    print(f"   Median Absolute Error: ${metrics['median_ae']:,.0f}")
+    
+    print(f"\n📈 PERCENTAGE ACCURACY:")
+    print(f"   MAPE:                  {metrics['mape']:.2f}%")
+    print(f"   Within ±10%:           {metrics['within_10_percent']:.1f}%")
+    print(f"   Within ±20%:           {metrics['within_20_percent']:.1f}%")
+    print(f"   Within ±30%:           {metrics['within_30_percent']:.1f}%")
+    
+    # Interpretation
+    print(f"\n🎯 INTERPRETATION:")
+    if metrics['r2_score'] >= 0.8:
+        print("   ✅ Excellent model fit")
+    elif metrics['r2_score'] >= 0.6:
+        print("   ✅ Good model fit")
+    elif metrics['r2_score'] >= 0.4:
+        print("   ⚠️  Moderate model fit")
+    else:
+        print("   ❌ Poor model fit")
+    
+    if metrics['within_20_percent'] >= 70:
+        print("   ✅ High prediction accuracy")
+    elif metrics['within_20_percent'] >= 50:
+        print("   ⚠️  Moderate prediction accuracy")
+    else:
+        print("   ❌ Low prediction accuracy")
+
+def compare_all_models_accuracy(model_results, y_test):
+    """
+    Compares accuracy of all models comprehensively.
+    """
+    all_metrics = []
+    
+    print(f"\n{'='*80}")
+    print("COMPREHENSIVE MODEL ACCURACY COMPARISON")
+    print(f"{'='*80}")
+    
+    for model_name, results in model_results.items():
+        y_pred = results['predictions']
+        metrics = calculate_comprehensive_metrics(y_test, y_pred, model_name)
+        all_metrics.append(metrics)
+        print_model_accuracy_report(metrics)
+    
+    # Create comparison DataFrame
+    comparison_df = pd.DataFrame(all_metrics)
+    
+    # Sort by R² score
+    comparison_df = comparison_df.sort_values('r2_score', ascending=False)
+    
+    print(f"\n{'='*80}")
+    print("QUICK COMPARISON TABLE")
+    print(f"{'='*80}")
+    
+    print(f"{'Model':<40} {'R²':<8} {'RMSE':<12} {'MAE':<12} {'±20%':<8}")
+    print("-" * 80)
+    
+    for _, row in comparison_df.iterrows():
+        print(f"{row['model_name']:<40} "
+              f"{row['r2_score']:<8.4f} "
+              f"${row['rmse']:<11,.0f} "
+              f"${row['mae']:<11,.0f} "
+              f"{row['within_20_percent']:<7.1f}%")
+    
+    return comparison_df
+
+def plot_accuracy_comparison(comparison_df):
+    """
+    Creates visualizations comparing model accuracy.
+    """
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # R² Score comparison
+    axes[0,0].bar(range(len(comparison_df)), comparison_df['r2_score'])
+    axes[0,0].set_title('R² Score Comparison')
+    axes[0,0].set_ylabel('R² Score')
+    axes[0,0].set_xticks(range(len(comparison_df)))
+    axes[0,0].set_xticklabels(comparison_df['model_name'], rotation=45, ha='right')
+    
+    # RMSE comparison
+    axes[0,1].bar(range(len(comparison_df)), comparison_df['rmse'])
+    axes[0,1].set_title('RMSE Comparison (Lower is Better)')
+    axes[0,1].set_ylabel('RMSE (USD)')
+    axes[0,1].set_xticks(range(len(comparison_df)))
+    axes[0,1].set_xticklabels(comparison_df['model_name'], rotation=45, ha='right')
+    axes[0,1].yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x/1000:.0f}K'))
+    
+    # Percentage within 20% accuracy
+    axes[1,0].bar(range(len(comparison_df)), comparison_df['within_20_percent'])
+    axes[1,0].set_title('Predictions Within ±20% (Higher is Better)')
+    axes[1,0].set_ylabel('Percentage (%)')
+    axes[1,0].set_xticks(range(len(comparison_df)))
+    axes[1,0].set_xticklabels(comparison_df['model_name'], rotation=45, ha='right')
+    
+    # MAPE comparison
+    axes[1,1].bar(range(len(comparison_df)), comparison_df['mape'])
+    axes[1,1].set_title('MAPE Comparison (Lower is Better)')
+    axes[1,1].set_ylabel('MAPE (%)')
+    axes[1,1].set_xticks(range(len(comparison_df)))
+    axes[1,1].set_xticklabels(comparison_df['model_name'], rotation=45, ha='right')
+    
+    plt.tight_layout()
+    plt.show()
 def prepare_data_for_training_improved(data, target_column='salary_in_usd', test_size=0.2, random_state=42):
     """
     Improved data preparation with better preprocessing.
@@ -570,18 +733,14 @@ def prepare_data_for_training_improved(data, target_column='salary_in_usd', test
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state
     )
-    
     print(f"\n=== Improved Data Preparation ===")
     print(f"Training set shape: {X_train.shape}")
     print(f"Test set shape: {X_test.shape}")
     print(f"Target variable: {target_column}")
     print(f"Number of features: {X.shape[1]}")
-    print(f"Target variable range: ${y.min():,.0f} - ${y.max():,.0f}")
-    print(f"Target variable mean: ${y.mean():,.0f}")
-    print(f"Target variable std: ${y.std():,.0f}")
     print()
     return X_train, X_test, y_train, y_test, processed_data
-
+    
 # Add this to your existing code at the bottom:
 df = load_dataset('C:\\Users\\tahar\\Desktop\\ds_salaries.csv')
 df = df.drop(['salary_currency', 'Unnamed: 0'], axis=1)
@@ -591,43 +750,7 @@ plot_pca_with_categorical(df)
 plot_correlation_heatmap_with_categorical(df)
 
 # === MACHINE LEARNING TRAINING ===
-print("\n" + "="*60)
-print("TRAINING MACHINE LEARNING MODELS FOR SALARY PREDICTION")
 print("="*60)
-
-# Prepare data for training
-X_train, X_test, y_train, y_test, processed_data = prepare_data_for_training(df, target_column='salary_in_usd')
-
-# Train models
-model_results = train_salary_prediction_models(X_train, X_test, y_train, y_test)
-
-# Plot predictions vs actual
-plot_salary_predictions(model_results, y_test)
-
-# Compare model metrics
-plot_model_comparison_metrics(model_results)
-
-# Analyze feature importance for tree-based models
-for model_name in ['Random Forest', 'Gradient Boosting']:
-    if model_name in model_results:
-        model = model_results[model_name]['model']
-        feature_importance_df = analyze_feature_importance(model, X_train.columns, model_name)
-        print(f"\nTop 10 Most Important Features for {model_name}:")
-        print(feature_importance_df.head(10)[['feature', 'importance']])
-
-# Show example prediction
-best_model_name = max(model_results.keys(), key=lambda x: model_results[x]['test_r2'])
-best_model = model_results[best_model_name]['model']
-print(f"\nUsing best model ({best_model_name}) for example prediction:")
-predict_salary_example(best_model, X_train.columns, processed_data)
-
-print(f"\n=== SUMMARY ===")
-print("Model Performance Ranking (by R² score):")
-for i, (name, result) in enumerate(sorted(model_results.items(), key=lambda x: x[1]['test_r2'], reverse=True), 1):
-    print(f"{i}. {name}: R² = {result['test_r2']:.4f}, MSE = ${result['test_mse']:,.0f}")
-
-# Replace your existing training code with:
-print("\n" + "="*60)
 print("TRAINING IMPROVED MACHINE LEARNING MODELS FOR SALARY PREDICTION")
 print("="*60)
 
@@ -661,3 +784,20 @@ print(f"\n=== IMPROVED MODEL SUMMARY ===")
 print("Model Performance Ranking (by R² score):")
 for i, (name, result) in enumerate(sorted(model_results.items(), key=lambda x: x[1]['test_r2'], reverse=True), 1):
     print(f"{i}. {name}: R² = {result['test_r2']:.4f}, MSE = ${result['test_mse']:,.0f}")
+
+print("\n" + "="*80)
+print("COMPREHENSIVE ACCURACY EVALUATION")
+print("="*80)
+
+# Evaluate all models comprehensively
+comparison_df = compare_all_models_accuracy(model_results, y_test)
+
+# Plot accuracy comparisons
+plot_accuracy_comparison(comparison_df)
+
+# Find the best model based on different criteria
+print(f"\n🏆 BEST MODELS BY DIFFERENT CRITERIA:")
+print(f"Best R² Score:        {comparison_df.iloc[0]['model_name']} ({comparison_df.iloc[0]['r2_score']:.4f})")
+print(f"Lowest RMSE:          {comparison_df.loc[comparison_df['rmse'].idxmin()]['model_name']} (${comparison_df['rmse'].min():,.0f})")
+print(f"Best ±20% Accuracy:   {comparison_df.loc[comparison_df['within_20_percent'].idxmax()]['model_name']} ({comparison_df['within_20_percent'].max():.1f}%)")
+print(f"Lowest MAPE:          {comparison_df.loc[comparison_df['mape'].idxmin()]['model_name']} ({comparison_df['mape'].min():.2f}%)")
